@@ -65,14 +65,34 @@ for Dataset = ds% loop over data sets
         errors(k,:,:) = error;
         neglect(k,:,:)= erLC;
     end
+    errorEffect = errors(:,2:end,1)-errors(:,2:end,2);% chosen - unchosen, set sizes 2-max
     
-    %% stats - t-tests
-    disp(['Stats for ',dname])
-    errorEffect = errors(:,2:end,1)-errors(:,2:end,2);
-    [h,p,ci,stats] = ttest(neglect(:,end,2));
-    disp(['Effect of errors type ns6 late: p=',num2str(p)])
-    disp(['effect of errors type ns6 late: t(',num2str(stats.df),')=',num2str(stats.tstat)])
-    
+    %% stats - t-tests across set sizes
+%     disp(['Stats for ',dname])
+%     totest = mean(errorEffect,2);% average across set sizes
+%     [h,p,ci,stats] = ttest(totest);
+%     disp(['Effect of errors type: p=',num2str(round(p,3,'significant'))])
+%     disp(['effect of errors type: t(',num2str(stats.df),')=',num2str(round(stats.tstat,3,'significant'))])
+%     d= nanmean(totest)/nanstd(totest); 
+%     CI95 = ci/nanstd(totest);
+%     fprintf("Cohen's d = %.2f, 95%% CI [%.2f, %.2f]\n", d, CI95(1), CI95(2));
+    %% stats - t-tests ns6
+%     disp(['Stats for ',dname])
+%     totest = errorEffect(:,end);% set size 6 except for Dev data set (set size 5)
+%     [h,p,ci,stats] = ttest(totest);
+%     disp(['Effect of errors type ns6: p=',num2str(round(p,3,'significant'))])
+%     disp(['effect of errors type ns6: t(',num2str(stats.df),')=',num2str(round(stats.tstat,3,'significant'))])
+%     d= nanmean(totest)/nanstd(totest); 
+%     CI95 = ci/nanstd(totest);
+%     fprintf("Cohen's d = %.2f, 95%% CI [%.2f, %.2f]\n", d, CI95(1), CI95(2));
+    %% stats - t-tests - late ns6
+        disp(['Stats for ',dname])
+        [h,p,ci,stats] = ttest(neglect(:,end,2));
+        disp(['Effect of errors type ns6 late: p=',num2str(round(p,3,'significant'))])
+        disp(['effect of errors type ns6 late: t(',num2str(stats.df),')=',num2str(round(stats.tstat,3,'significant'))])
+        d= nanmean(neglect(:,end,2))/nanstd(neglect(:,end,2));
+        CI95 = ci/nanstd(neglect(:,end,2));
+        fprintf("Cohen's d = %.2f, 95%% CI [%.2f, %.2f]\n", d, CI95(1), CI95(2));
     %% stats - mixed effects of set size
     perf =squeeze(nanmean(LCs(:,:,2:end),2));
     

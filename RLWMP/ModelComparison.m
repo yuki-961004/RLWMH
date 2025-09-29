@@ -80,6 +80,7 @@ mAICs =AICs - repmat(mean(AICs(:,toconsider),2),1,size(AICs,2));
     subplot(1,2,1)
     bar(mean(mAICs),'facecolor',[.5 .5 .5])
     hold on
+    plot(mAICs','.','color',[.25 .25 .25])
     errorbar(mean(mAICs), std(mAICs)/sqrt(size(mAICs,1)),'.k')
     box off
     %ylim([0 .75])
@@ -87,7 +88,6 @@ mAICs =AICs - repmat(mean(AICs(:,toconsider),2),1,size(AICs,2));
     set(gca,'xtick',1:length(toconsider),'xticklabels',ticnames,'fontsize',12)
     ylabel('\Delta AIC')
     xtickangle(45)
-    
     %% Proportion best fit. 
     [~,best]= min(mAICs,[],2);
     for m=1:length(toconsider)
@@ -109,7 +109,7 @@ clear all
 
 m = 7;
 dataset=14;
-figure;
+%figure;
 load(['Fits/FitRL2_dataset',num2str(dataset)])
 Params = All_Params{m};
 %% plot params (Fig. S12)

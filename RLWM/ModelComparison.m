@@ -22,10 +22,11 @@ remapping = [remapping 10+remapping 20+remapping 31:40 40+remapping ...
     50+remapping 60+remapping 70+remapping 81 82 83 90+remapping 100+remapping];
 
 ticnames =[];
+%% for figure 3, select models below;
+toconsider = [9 6 2 8 26 38 42];% 
+
 %% for supplementary figure 6, select models 1:10
 %toconsider =1:10;
-%% for figure 2A, select models below;
-toconsider = [9 6 2 8 26 38 42];% list for the first paper submission.
 %% Supplementary figure with free WM alpha+ or RL forgetting  or bias or no WM>K(S7)
 %toconsider = [2 8 52 62 68 92 102 106];
 
@@ -92,8 +93,9 @@ for dataset = ds([1:6])
     [~,best]= min(mean(mAICs(:,toconsider))); 
     mAICs = mAICs(:,toconsider)-repmat(mAICs(:,toconsider(best)),1,length(toconsider));
     subplot(2,6,count)
-    bar(mean(mAICs))
+    bar(mean(mAICs),'facecolor',[.5 .5 .5])
     hold on
+    plot(mAICs','.','color',[.25 .25 .25])
     errorbar(mean(mAICs), std(mAICs)/sqrt(size(mAICs,1)),'.k')
     box off
     %ylim([0 .75])
@@ -108,7 +110,7 @@ for dataset = ds([1:6])
         prop(m)=mean(best==m);
     end
     subplot(2,6,6+count)
-    bar(prop)
+    bar(prop,'facecolor',[.5 .5 .5])
     box off
     [~,bestmodel] = max(prop);
     title([dnames{count},'; best=',ticnames{bestmodel}])
