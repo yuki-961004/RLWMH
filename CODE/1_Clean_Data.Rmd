@@ -1,0 +1,104 @@
+---
+title: "Untitled"
+author: "yuki"
+date: "2026-01-12"
+output: html_document
+---
+```{r}
+read.mat <- function(raw, out) {
+  # 读取 .mat 文件
+  mat_data <- R.matlab::readMat(raw)
+  
+  # 假设 .mat 中主要数据对象叫 data
+  df <- base::as.data.frame(mat_data$expe.data)
+  col_names <- base::unlist(base::lapply(mat_data$columns, `[`, 1))
+  # 赋予 df 列名
+  base::colnames(df) <- col_names
+  
+  # 保存为 csv
+  utils::write.csv(df, out, row.names = FALSE)
+}
+```
+
+```{r}
+read.mat(raw = "../RAW/RLWM/DataSets/Expe1.mat", out = "../DATA/Exp_1.csv")
+```
+
+```{r}
+raw <- read.csv("../DATA/Exp_1.csv")
+clean <- raw |>
+  dplyr::mutate(
+    stimseq = case_when(
+      stimseq == 1 ~ "A",
+      stimseq == 2 ~ "B",
+      stimseq == 3 ~ "C",
+      stimseq == 4 ~ "D",
+      stimseq == 5 ~ "E",
+      stimseq == 6 ~ "F",
+    ),
+    imageseq = case_when(
+      imageseq == 1 ~ "alpha",
+      imageseq == 2 ~ "beta",
+      imageseq == 3 ~ "gamma",
+      imageseq == 4 ~ "delta",
+      imageseq == 5 ~ "epsilon",
+      imageseq == 6 ~ "zeta",
+    ),
+    corAseq = case_when(
+      corAseq == 1 ~ "J",
+      corAseq == 2 ~ "K",
+      corAseq == 3 ~ "L",
+    ),
+    choice = case_when(
+      choice == 1 ~ "J",
+      choice == 2 ~ "K",
+      choice == 3 ~ "L",
+      choice == -1 ~ NA_character_,
+    ),
+    delay = case_when(
+      delay == "NaN" ~ NA_real_,
+      TRUE ~ delay
+    )
+  ) |>
+  dplyr::rename(
+    Element_1 = stimseq,
+    Element_2 = imageseq,
+    Element_3 = folderseq,
+    Correct = corAseq,
+  ) |>
+  dplyr::mutate(
+    Object_1 = paste0(Element_1, "J"),
+    Object_2 = paste0(Element_1, "K"),
+    Object_3 = paste0(Element_1, "L"),
+    
+    Reward_1 = dplyr::if_else(Correct == "J", 1, 0),
+    Reward_2 = dplyr::if_else(Correct == "K", 1, 0),
+    Reward_3 = dplyr::if_else(Correct == "L", 1, 0),
+    
+    choice = paste0(Element_1, choice),
+  ) |>
+  dplyr::select(
+    Subject = subno,
+    Block = block,
+    Trial = time,
+    Object_1,
+    Object_2,
+    Object_3,
+    Reward_1, 
+    Reward_2, 
+    Reward_3, 
+    Action = choice,
+    SetSize = ns,
+    Stim_Count = iterseq,
+    RT = rt,
+    PreCorrect = pcor,
+    Delay = delay
+  ) |>
+  dplyr::filter(RT > 0)
+```
+
+```{r}
+data <- clean
+save(data, file = "../DATA/data1.Rdata")
+```
+

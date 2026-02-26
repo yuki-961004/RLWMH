@@ -1,0 +1,13 @@
+.Rproj.user
+.Rhistory
+*.RData
+.Ruserdata
+
+# MacOS
+.DS_Store
+# Windows
+desktop.ini
+# VS Code
+.vscode
+# temp
+~*

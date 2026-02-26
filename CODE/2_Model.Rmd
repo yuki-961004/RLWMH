@@ -1,0 +1,157 @@
+---
+title: "Untitled"
+author: "yuki"
+date: "2026-02-13"
+output: html_document
+---
+
+```{r setup}
+load("../DATA/data1.Rdata")
+
+behrule = list(
+  cue = c(
+    "AJ", "AK", "AL", 
+    "BJ", "BK", "BL", 
+    "CJ", "CK", "CL", 
+    "DJ", "DK", "DL", 
+    "EJ", "EK", "EL", 
+    "FJ", "FK", "FL"
+  ),
+  rsp = c(
+    "AJ", "AK", "AL", 
+    "BJ", "BK", "BL", 
+    "CJ", "CK", "CL", 
+    "DJ", "DK", "DL", 
+    "EJ", "EK", "EL", 
+    "FJ", "FK", "FL"
+  )
+)
+colnames = list(
+  subid = "Subject", block = "Block", trial = "Trial",
+  object = c("Object_1", "Object_2", "Object_3"),
+  reward = c("Reward_1", "Reward_2", "Reward_3"),
+  action = "Action",
+  exinfo = c("SetSize")
+)
+```
+
+
+## TD(test)
+
+```{r}
+multiRL.model <- multiRL::run_m(
+  data = data[data[, "Subject"] == 1, ],
+  behrule = behrule,
+  colnames = colnames,
+  params = list(
+    free = list(
+      alpha = 0.6,
+      beta = 2
+    ),
+    constant = list(
+      reset = 0
+    )
+  ),
+  priors = list(),
+  settings = list(
+    name = "TD",
+    mode = "fitting",
+    estimate = "MLE",
+    policy = "on"
+  )
+)
+
+multiRL.summary <- multiRL::summary(multiRL.model)
+```
+
+## TD(model)
+
+```{r}
+TD <- function(params){
+  
+  params <- list(
+    free = list(alpha = params[1], beta = params[2]),
+    constant = list(reset = 0)
+  )
+
+  multiRL.model <- multiRL::run_m(
+    data = data,
+    behrule = behrule,
+    colnames = colnames,
+    params = params,
+    funcs = funcs,
+    priors = priors,
+    settings = settings
+  )
+  
+  assign(x = "multiRL.model", value = multiRL.model, envir = multiRL.env)
+  return(.return_result(multiRL.model))
+}
+
+```
+
+## TD(recovery)
+
+```{r}
+reticulate::use_condaenv(condaenv = "tf-gpu", required = TRUE)
+```
+
+```{r}
+recovery <- multiRL::rcv_d(
+  estimate = "MLE",
+  algorithm = "NLOPT_GN_MLSL",
+  
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+
+  models = list(TD),
+  priors = list(
+    list(
+      alpha = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)}, 
+      beta = function(x) {stats::rexp(n = 1, rate = 1)}
+    )
+  ),
+  settings = list(list(name = "TD")),
+  
+  lowers = list(c(0, 0)),
+  uppers = list(c(1, 10)),
+  control = list(
+    core = 10, sample = 100, train = 1000,
+    info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize"),
+    reduction = "PLS"
+  )
+)
+
+save(recovery, file = "../OUTPUT/recovery.TD.Rdata")
+```
+
+```{r}
+replay.recovery <- multiRL::rpl_e(
+  result = recovery,
+
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+  
+  models = list(TD),
+  settings = list(name = c("TD")),
+
+  omit = c("data", "funcs")
+)
+  
+save(replay.recovery, file = "../OUTPUT/replay.recovery.TD.Rdata")
+
+p <- plot(x = replay.recovery)
+ggplot2::ggsave(
+  plot = p$param$TD[[1]], filename = "../TD_alpha.png",
+  width = 5, height = 5
+)
+ggplot2::ggsave(
+  plot = p$param$TD[[2]], filename = "../TD_beta.png",
+  width = 5, height = 5
+)
+rm(p)
+```
+
+## TD(recovery)
