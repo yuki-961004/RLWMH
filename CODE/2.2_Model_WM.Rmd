@@ -1,0 +1,308 @@
+---
+title: "Untitled"
+author: "yuki"
+date: "2026-02-13"
+output: html_document
+---
+
+```{r setup}
+load("../DATA/data1.Rdata")
+
+behrule = list(
+  cue = c(
+    "AJ", "AK", "AL", 
+    "BJ", "BK", "BL", 
+    "CJ", "CK", "CL", 
+    "DJ", "DK", "DL", 
+    "EJ", "EK", "EL", 
+    "FJ", "FK", "FL"
+  ),
+  rsp = c(
+    "AJ", "AK", "AL", 
+    "BJ", "BK", "BL", 
+    "CJ", "CK", "CL", 
+    "DJ", "DK", "DL", 
+    "EJ", "EK", "EL", 
+    "FJ", "FK", "FL"
+  )
+)
+colnames = list(
+  subid = "Subject", block = "Block", trial = "Trial",
+  object = c("Object_1", "Object_2", "Object_3"),
+  reward = c("Reward_1", "Reward_2", "Reward_3"),
+  action = "Action",
+  exinfo = c("SetSize")
+)
+```
+
+
+## WM(test)
+
+```{r}
+dcay_wm <- function(
+    value0, 
+    values,
+    reward,
+    params,
+    system,
+    ...
+){
+  
+  list2env(list(...), envir = environment())
+  
+  # If you need extra information(...)
+  # Column names may be lost(C++), indexes are recommended
+  # e.g.
+  # Trial  <- idinfo[3]
+  # Frame  <- exinfo[1]
+  # Action <- behave[1]
+  
+  zeta       <-  params[["zeta"]]
+  bonus      <-  params[["bonus"]]
+  
+  decay <- values + zeta * (value0 - values)
+
+  return(decay)
+}
+```
+
+
+```{r}
+multiRL.model <- multiRL::run_m(
+  data = data[data[, "Subject"] == 1, ],
+  behrule = behrule,
+  colnames = colnames,
+  params = list(
+    free = list(
+      zeta = 0.1,
+      beta = 0.5
+    ),
+    fixed = list(Q0 = 0.5, alpha = 1, weight = 1),
+    constant = list(reset = 0.5)
+  ),
+  priors = list(),
+  settings = list(
+    name = "WM",
+    mode = "fitting",
+    estimate = "MLE",
+    policy = "on",
+    system = "WM"
+  ),
+  funcs = list(prob_func = prob_wm, dcay_func = dcay_wm)
+)
+
+multiRL.summary <- multiRL::summary(multiRL.model)
+```
+
+## WM(model)
+
+```{r}
+WM <- function(params){
+  
+  params <- list(
+    free = list(
+      zeta = params[1], beta = params[2]
+    ),
+    fixed = list(Q0 = 0.5, alpha = 1, weight = 1),
+    constant = list(reset = 0.5)
+  )
+
+  multiRL.model <- multiRL::run_m(
+    data = data,
+    behrule = behrule,
+    colnames = colnames,
+    params = params,
+    funcs = funcs,
+    priors = priors,
+    settings = settings
+  )
+  
+  assign(x = "multiRL.model", value = multiRL.model, envir = multiRL.env)
+  return(.return_result(multiRL.model))
+}
+
+```
+
+## WM(recovery)
+
+```{r}
+reticulate::use_condaenv(condaenv = "tf-gpu", required = TRUE)
+```
+
+```{r}
+recovery <- multiRL::rcv_d(
+  estimate = "ABC",
+  algorithm = "NLOPT_GN_MLSL",
+  
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+
+  models = list(WM),
+  priors = list(
+    list(
+      zeta = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)},
+      beta = function(x) {stats::rexp(n = 1, rate = 1)}
+    )
+  ),
+  settings = list(list(name = "WM", system = "WM")),
+  funcs = list(list(dcay_func = dcay_wm)),
+  
+  lowers = list(c(0, 0)),
+  uppers = list(c(1, 10)),
+  control = list(
+    core = 10, sample = 100, train = 1000,
+    info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize"),
+    reduction = "PCA"
+  )
+)
+
+save(recovery, file = "../OUTPUT/recovery.WM.Rdata")
+```
+
+```{r}
+replay.recovery <- multiRL::rpl_e(
+  result = recovery,
+
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+  
+  models = list(WM),
+  settings = list(list(name = "WM", system = "WM")),
+  funcs = list(list(dcay_func = dcay_wm)),
+
+  omit = c("data", "funcs")
+)
+  
+save(replay.recovery, file = "../OUTPUT/replay.recovery.WM.Rdata")
+
+p <- plot(x = replay.recovery)
+ggplot2::ggsave(
+  plot = p$param[[1]]$zeta, filename = "../WM_zeta.png",
+  width = 5, height = 5
+)
+ggplot2::ggsave(
+  plot = p$param[[1]]$beta, filename = "../WM_beta.png",
+  width = 5, height = 5
+)
+
+rm(p)
+```
+
+## WM(fitting)
+
+```{r}
+fitting <- multiRL::fit_p(
+  estimate = "ABC",
+  algorithm = "NLOPT_GN_MLSL",
+  
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+
+  models = list(WM),
+  priors = list(
+    list(
+      zeta = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)}, 
+      beta = function(x) {stats::rexp(n = 1, rate = 1)}
+    )
+  ),
+  settings = list(list(name = "WM", system = "WM")),
+  funcs = list(list(dcay_func = dcay_wm)),
+  
+  lowers = list(c(0, 0)),
+  uppers = list(c(1, 10)),
+  control = list(
+    core = 10, sample = 100, train = 1000,
+    info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize"),
+    reduction = "PLS"
+  )
+)
+
+save(fitting, file = "../OUTPUT/fitting.WM.Rdata")
+```
+
+## WM(replay)
+
+```{r}
+replay.fitting <- multiRL::rpl_e(
+  result = fitting,
+
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+  
+  models = list(WM),
+  settings = list(list(name = "WM", system = "WM")),
+  funcs = list(list(dcay_func = dcay_wm)),
+
+  omit = c("funcs")
+)
+
+p <- plot(replay.fitting)
+ggplot2::ggsave(filename = "../RLWM_fitting.png", width = 40, height = 5)
+
+save(replay.fitting, file = "../OUTPUT/replay.fitting.WM.Rdata")
+```
+
+```{r}
+load("../OUTPUT/replay.fitting.WM.Rdata")
+
+data_fitting <- base::do.call(
+  base::rbind,
+  base::lapply(
+    replay.fitting[[1]],
+    function(subject) {
+      subject[["multiRL.summary"]]@data
+    }
+  )
+) |>
+  dplyr::select(
+    Subject, SetSize, Stim_Count, Reward
+  ) |>
+  dplyr::group_by(Subject, SetSize, Stim_Count) |>
+  dplyr::summarise(Acc = mean(Reward)) |>
+  dplyr::ungroup()
+
+# 计算每个 SetSize 在每个 Stim_Count 下的均值和标准误
+data_fitting <- stats::aggregate(
+  Acc ~ Stim_Count + SetSize,
+  data = data_fitting,
+  FUN = function(x) {
+    c(mean = base::mean(x), se = stats::sd(x) / base::sqrt(base::length(x)))
+  }
+)
+
+# 将 aggregate 的 matrix 结果展开为列
+data_fitting <- base::do.call(base::data.frame, data_fitting)
+base::colnames(data_fitting) <- c("Stim_Count", "SetSize", "Acc", "SE")
+```
+
+```{r}
+ggplot2::ggplot(
+  data = data_fitting,
+  mapping = ggplot2::aes(
+    x = Stim_Count,
+    y = Acc,
+    color = base::as.factor(SetSize),
+    group = SetSize
+  )
+) +
+  ggplot2::geom_line(linewidth = 0.8) +
+  ggplot2::geom_point(size = 2) +
+  ggplot2::scale_x_continuous(breaks = 1:15) +
+  ggplot2::scale_y_continuous(limits = c(0, 1)) +
+  ggplot2::geom_errorbar(
+    ggplot2::aes(ymin = Acc - SE, ymax = Acc + SE),
+    width = 0.2
+  ) +
+  ggplot2::labs(
+    x = "Iteration (Stim_Count)",
+    y = "Accuracy (Acc)",
+    color = "Set Size"
+  ) +
+  papaja::theme_apa()
+
+ggplot2::ggsave(filename = "../Exp_Effect_WM.png", width = 8, height = 6)
+```

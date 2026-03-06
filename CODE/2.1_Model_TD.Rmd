@@ -5,6 +5,8 @@ date: "2026-02-13"
 output: html_document
 ---
 
+## load
+
 ```{r setup}
 load("../DATA/data1.Rdata")
 
@@ -48,6 +50,9 @@ multiRL.model <- multiRL::run_m(
       alpha = 0.6,
       beta = 2
     ),
+    fixed = list(
+      Q0 = 0.5
+    ),
     constant = list(
       reset = 0
     )
@@ -71,7 +76,8 @@ TD <- function(params){
   
   params <- list(
     free = list(alpha = params[1], beta = params[2]),
-    constant = list(reset = 0)
+    fixed = list(Q0 = 0.5),
+    constant = list(reset = 0.5)
   )
 
   multiRL.model <- multiRL::run_m(
@@ -98,7 +104,7 @@ reticulate::use_condaenv(condaenv = "tf-gpu", required = TRUE)
 
 ```{r}
 recovery <- multiRL::rcv_d(
-  estimate = "MLE",
+  estimate = "ABC",
   algorithm = "NLOPT_GN_MLSL",
   
   data = data,
@@ -119,7 +125,7 @@ recovery <- multiRL::rcv_d(
   control = list(
     core = 10, sample = 100, train = 1000,
     info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize"),
-    reduction = "PLS"
+    reduction = "PCA"
   )
 )
 
@@ -154,4 +160,117 @@ ggplot2::ggsave(
 rm(p)
 ```
 
-## TD(recovery)
+## TD(fitting)
+
+```{r}
+fitting <- multiRL::fit_p(
+  estimate = "ABC",
+  algorithm = "NLOPT_GN_MLSL",
+  
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+
+  models = list(TD),
+  priors = list(
+    list(
+      alpha = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)}, 
+      beta = function(x) {stats::rexp(n = 1, rate = 1)}
+    )
+  ),
+  settings = list(list(name = "TD", policy = "off")),
+  
+  lowers = list(c(0, 0)),
+  uppers = list(c(1, 10)),
+  control = list(
+    core = 10, sample = 100, train = 1000,
+    info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize"),
+    reduction = "PLS"
+  )
+)
+
+save(fitting, file = "../OUTPUT/fitting.TD.Rdata")
+```
+
+## TD(replay)
+
+```{r}
+replay.fitting <- multiRL::rpl_e(
+  result = fitting,
+
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+  
+  models = list(TD),
+  settings = list(name = c("TD")),
+
+  omit = c("funcs")
+)
+
+p <- plot(replay.fitting)
+ggplot2::ggsave(filename = "../TD_fitting.png", width = 40, height = 5)
+
+save(replay.fitting, file = "../OUTPUT/replay.fitting.TD.Rdata")
+```
+
+```{r}
+load("../OUTPUT/replay.fitting.TD.Rdata")
+
+data_fitting <- base::do.call(
+  base::rbind,
+  base::lapply(
+    replay.fitting[[1]],
+    function(subject) {
+      subject[["multiRL.summary"]]@data
+    }
+  )
+) |>
+  dplyr::select(
+    Subject, SetSize, Stim_Count, Reward
+  ) |>
+  dplyr::group_by(Subject, SetSize, Stim_Count) |>
+  dplyr::summarise(Acc = mean(Reward)) |>
+  dplyr::ungroup()
+
+# 计算每个 SetSize 在每个 Stim_Count 下的均值和标准误
+data_fitting <- stats::aggregate(
+  Acc ~ Stim_Count + SetSize,
+  data = data_fitting,
+  FUN = function(x) {
+    c(mean = base::mean(x), se = stats::sd(x) / base::sqrt(base::length(x)))
+  }
+)
+
+# 将 aggregate 的 matrix 结果展开为列
+data_fitting <- base::do.call(base::data.frame, data_fitting)
+base::colnames(data_fitting) <- c("Stim_Count", "SetSize", "Acc", "SE")
+```
+
+```{r}
+ggplot2::ggplot(
+  data = data_fitting,
+  mapping = ggplot2::aes(
+    x = Stim_Count,
+    y = Acc,
+    color = base::as.factor(SetSize),
+    group = SetSize
+  )
+) +
+  ggplot2::geom_line(linewidth = 0.8) +
+  ggplot2::geom_point(size = 2) +
+  ggplot2::scale_x_continuous(breaks = 1:15) +
+  ggplot2::scale_y_continuous(limits = c(0, 1)) +
+  ggplot2::geom_errorbar(
+    ggplot2::aes(ymin = Acc - SE, ymax = Acc + SE),
+    width = 0.2
+  ) +
+  ggplot2::labs(
+    x = "Iteration (Stim_Count)",
+    y = "Accuracy (Acc)",
+    color = "Set Size"
+  ) +
+  papaja::theme_apa()
+
+ggplot2::ggsave(filename = "../Exp_Effect_TD.png", width = 8, height = 6)
+```
