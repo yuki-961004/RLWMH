@@ -5,8 +5,6 @@ date: "2026-02-13"
 output: html_document
 ---
 
-## load
-
 ```{r setup}
 load("../DATA/data1.Rdata")
 
@@ -39,7 +37,66 @@ source("./functions_plot.R")
 ```
 
 
-## TD(test)
+## RLWM(test)
+
+```{r}
+prob_rlwm3 <- function(
+    shown,
+    qvalue, 
+    explor,
+    params,
+    system,
+    ...
+){
+  
+  list2env(list(...), envir = environment())
+  
+  # If you need extra information(...)
+  # Column names may be lost(C++), indexes are recommended
+  # e.g.
+  # Trial  <- idinfo[3]
+  # Frame  <- exinfo[1]
+  # Action <- behave[1]
+  
+  setsize  <- as.numeric(exinfo[1])
+  
+  beta     <- params[["beta"]]
+  lapse    <- params[["lapse"]]
+  weight   <- params[["weight"]]
+  capacity <- params[["capacity"]]
+
+  index     <- which(!is.na(qvalue[[1]]))
+  n_shown   <- length(index)
+  n_system  <- length(qvalue)
+  n_options <- length(qvalue[[1]])
+  
+  # Assign weights to different systems
+  rho <- c(weight, 1 - weight)
+  
+  # Compute the probabilities estimated by different systems
+  prob_mat <- matrix(0, nrow = n_options, ncol = n_system)
+  
+  if (explor == 1) {
+    prob_mat[index, ] <- 1 / n_shown
+    prob_mat[prob_mat == 0] <- NA
+  } else {
+    for (s in seq_len(n_system)) {
+      sub_qvalue <- qvalue[[s]]
+      exp_stable <- exp(beta * (sub_qvalue - max(sub_qvalue, na.rm = TRUE)))
+      prob_mat[, s] <- exp_stable / sum(exp_stable, na.rm = TRUE)
+    }
+  }
+  
+  # Weighted average
+  prob <- as.vector(prob_mat %*% rho)
+  
+  # lapse
+  prob <- (1 - lapse * n_shown) * prob + lapse
+  
+  return(prob)
+}
+```
+
 
 ```{r}
 multiRL.model <- multiRL::run_m(
@@ -49,7 +106,8 @@ multiRL.model <- multiRL::run_m(
   params = list(
     free = list(
       alpha = 0.6,
-      beta = 2
+      beta = 20,
+      weight = 0.5 
     ),
     fixed = list(delta = 0),
     constant = list(Q0 = 0.33, reset = 0.33)
@@ -59,20 +117,25 @@ multiRL.model <- multiRL::run_m(
     name = "TD",
     mode = "fitting",
     estimate = "MLE",
-    policy = "on"
-  )
+    policy = "on",
+    system = c("RL", "WM")
+  ),
+  funcs = list(prob_func = prob_rlwm3)
 )
 
 multiRL.summary <- multiRL::summary(multiRL.model)
 ```
 
-## TD(model)
+## RLWM(model)
 
 ```{r}
-TD <- function(params){
+RLWM <- function(params){
   
   params <- list(
-    free = list(alpha = params[1], beta = params[2]),
+    free = list(
+      alpha = params[1], beta = params[2],
+      weight = params[3]
+    ),
     fixed = list(delta = 0),
     constant = list(Q0 = 0.33, reset = 0.33)
   )
@@ -93,7 +156,7 @@ TD <- function(params){
 
 ```
 
-## TD(recovery)
+## RLWM(recovery)
 
 ```{r}
 reticulate::use_condaenv(condaenv = "tf-gpu", required = TRUE)
@@ -108,83 +171,19 @@ recovery <- multiRL::rcv_d(
   behrule = behrule,
   colnames = colnames,
 
-  models = list(TD),
+  models = list(RLWM),
   priors = list(
     list(
       alpha = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)}, 
-      beta = function(x) {stats::rexp(n = 1, rate = 1)}
+      beta = function(x) {stats::rexp(n = 1, rate = 1)},
+      weight = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)} 
     )
   ),
-  settings = list(list(name = "TD")),
+  settings = list(list(name = "RLWM", system = c("RL", "WM"))),
+  funcs = list(list(prob_func = prob_rlwm3)),
   
-  lowers = list(c(0, 0)),
-  uppers = list(c(1, 10)),
-  control = list(
-    core = 10, sample = 100, 
-    # LBI
-    iter = 100,
-    # SBI
-    train = 1000,
-    # ABC
-    reduction = "PCA", ncomp = 6,
-    # RNN
-    info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize")
-  )
-)
-
-save(recovery, file = "../OUTPUT/recovery.TD.Rdata")
-```
-
-```{r}
-replay.recovery <- multiRL::rpl_e(
-  result = recovery,
-
-  data = data,
-  behrule = behrule,
-  colnames = colnames,
-  
-  models = list(TD),
-  settings = list(name = c("TD")),
-
-  omit = c("data", "funcs")
-)
-  
-save(replay.recovery, file = "../OUTPUT/replay.recovery.TD.Rdata")
-
-p <- plot(x = replay.recovery)
-ggplot2::ggsave(
-  plot = p$param$TD[[1]], filename = "../TD_alpha.png",
-  width = 5, height = 5
-)
-ggplot2::ggsave(
-  plot = p$param$TD[[2]], filename = "../TD_beta.png",
-  width = 5, height = 5
-)
-rm(p)
-```
-
-## TD(fitting)
-
-```{r}
-fitting <- multiRL::fit_p(
-  estimate = "MLE",
-  algorithm = "NLOPT_GN_MLSL",
-  
-  data = data,
-  behrule = behrule,
-  colnames = colnames,
-
-  models = list(TD),
-  priors = list(
-    list(
-      alpha = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)}, 
-      beta = function(x) {stats::rexp(n = 1, rate = 0.1)}
-    )
-  ),
-  settings = list(list(name = "TD")),
-  
-  lowers = list(c(0, 0)),
-  uppers = list(c(1, 50)),
+  lowers = list(c(0, 0, 0)),
+  uppers = list(c(1, 10, 1)),
   control = list(
     core = 10, sample = 100, 
     # LBI
@@ -198,12 +197,88 @@ fitting <- multiRL::fit_p(
   )
 )
 
-save(fitting, file = "../OUTPUT/fitting.TD.Rdata")
+save(recovery, file = "../OUTPUT/recovery.RLWM_3.Rdata")
 ```
 
-## TD(replay)
+```{r}
+replay.recovery <- multiRL::rpl_e(
+  result = recovery,
+
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+  
+  models = list(RLWM),
+  settings = list(list(name = "RLWM", system = c("RL", "WM"))),
+  funcs = list(list(prob_func = prob_rlwm3)),
+
+  omit = c("data", "funcs")
+)
+  
+save(replay.recovery, file = "../OUTPUT/replay.recovery.RLWM_3.Rdata")
+
+p <- plot(x = replay.recovery)
+ggplot2::ggsave(
+  plot = p$param[[1]]$alpha, filename = "../RLWM_3_alpha.png",
+  width = 5, height = 5
+)
+ggplot2::ggsave(
+  plot = p$param[[1]]$beta, filename = "../RLWM_3_beta.png",
+  width = 5, height = 5
+)
+ggplot2::ggsave(
+  plot = p$param[[1]]$weight, filename = "../RLWM_3_weight.png",
+  width = 5, height = 5
+)
+
+rm(p)
+```
+
+## RLWM(fitting)
 
 ```{r}
+fitting <- multiRL::fit_p(
+  estimate = "MLE",
+  algorithm = "NLOPT_GN_MLSL",
+  
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+
+  models = list(RLWM),
+  priors = list(
+    list(
+      alpha = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)}, 
+      beta = function(x) {stats::rexp(n = 1, rate = 0.1)},
+      weight = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)} 
+    )
+  ),
+  settings = list(list(name = "RLWM", system = c("RL", "WM"))),
+  funcs = list(list(prob_func = prob_rlwm3)),
+  
+  lowers = list(c(0, 0, 0)),
+  uppers = list(c(1, 50, 1)),
+  control = list(
+    core = 10, sample = 100, 
+    # LBI
+    iter = 100,
+    # SBI
+    train = 1000,
+    # ABC
+    reduction = "PCA", #ncomp = 6,
+    # RNN
+    info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize")
+  )
+)
+
+save(fitting, file = "../OUTPUT/fitting.RLWM_3.Rdata")
+```
+
+## RLWM(replay)
+
+```{r}
+#load("../OUTPUT/fitting.RLWM.Rdata")
+
 replay.fitting <- multiRL::rpl_e(
   result = fitting,
 
@@ -211,20 +286,21 @@ replay.fitting <- multiRL::rpl_e(
   behrule = behrule,
   colnames = colnames,
   
-  models = list(TD),
-  settings = list(name = c("TD")),
+  models = list(RLWM),
+  settings = list(list(name = "RLWM", system = c("RL", "WM"))),
+  funcs = list(list(prob_func = prob_rlwm3)),
 
   omit = c("funcs")
 )
 
 #p <- plot(replay.fitting)
-#ggplot2::ggsave(filename = "../TD_fitting.png", width = 40, height = 5)
+#ggplot2::ggsave(filename = "../fitting_RLWM_3.png", width = 40, height = 5)
 
-save(replay.fitting, file = "../OUTPUT/replay.fitting.TD.Rdata")
+save(replay.fitting, file = "../OUTPUT/replay.fitting.RLWM_3.Rdata")
 ```
 
 ```{r}
-#load("../OUTPUT/replay.fitting.TD.Rdata")
+#load("../OUTPUT/replay.fitting.RLWM_3.Rdata")
 
 data_fitting <- base::do.call(
   base::rbind,
@@ -239,12 +315,12 @@ data_fitting <- base::do.call(
 p <- extract_setsize_history(data_fitting)
 plot_setsize_analysis(p)
 
-ggplot2::ggsave(filename = "../SetSize_Effect_TD.png", width = 8, height = 6)
+ggplot2::ggsave(filename = "../SetSize_Effect_RLWM_3.png", width = 8, height = 6)
 rm(p)
 ```
 
 ```{r}
-#load("../OUTPUT/replay.fitting.TD.Rdata")
+#load("../OUTPUT/replay.fitting.RLWM_3.Rdata")
 
 data_fitting <- base::do.call(
   base::rbind,
@@ -259,7 +335,7 @@ data_fitting <- base::do.call(
 p <- extract_error_history(data_fitting, "Simulation")
 plot_error_analysis(p)
 
-ggplot2::ggsave(filename = "../Error_Effect_TD.png", width = 8, height = 6)
+ggplot2::ggsave(filename = "../Error_Effect_RLWM_3.png", width = 8, height = 6)
 
 rm(p)
 ```

@@ -6,8 +6,10 @@ output: html_document
 ---
 
 ```{r setup}
+# raw data
 load("../DATA/data1.Rdata")
 
+# settings
 behrule = list(
   cue = c(
     "AJ", "AK", "AL", 
@@ -33,9 +35,9 @@ colnames = list(
   action = "Action",
   exinfo = c("SetSize")
 )
+
 source("./functions_plot.R")
 ```
-
 
 ## WM(test)
 
@@ -63,7 +65,11 @@ dcay_wm <- function(
   bonus      <-  params[["bonus"]]
   
   decay <- values + zeta * (value0 - values)
-
+  
+  if (reward == 1) {
+    decay <- ifelse(test = is.na(shown), yes = decay, no = 0)
+  } 
+  
   return(decay)
 }
 ```
@@ -71,12 +77,13 @@ dcay_wm <- function(
 
 ```{r}
 multiRL.model <- multiRL::run_m(
-  data = data[data[, "Subject"] == 1, ],
+  data = data[data[, "Subject"] == 3, ],
   behrule = behrule,
   colnames = colnames,
   params = list(
     free = list(
-      zeta = 0.1, beta = 20
+      zeta = 0.1,
+      beta = 15
     ),
     fixed = list(alpha = 1, delta = 0),
     constant = list(weight = 1, Q0 = 0.33, reset = 0.33)
@@ -132,7 +139,7 @@ reticulate::use_condaenv(condaenv = "tf-gpu", required = TRUE)
 
 ```{r}
 recovery <- multiRL::rcv_d(
-  estimate = "ABC",
+  estimate = "MLE",
   algorithm = "NLOPT_GN_MLSL",
   
   data = data,
@@ -143,22 +150,28 @@ recovery <- multiRL::rcv_d(
   priors = list(
     list(
       zeta = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)},
-      beta = function(x) {stats::rexp(n = 1, rate = 1)}
+      beta = function(x) {stats::rexp(n = 1, rate = 0.1)}
     )
   ),
   settings = list(list(name = "WM", system = "WM")),
   funcs = list(list(dcay_func = dcay_wm)),
   
   lowers = list(c(0, 0)),
-  uppers = list(c(1, 10)),
+  uppers = list(c(1, 50)),
   control = list(
-    core = 10, sample = 100, train = 1000,
-    info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize"),
-    reduction = "PLS", ncomp = 6
+    core = 10, sample = 100, 
+    # LBI
+    iter = 100,
+    # SBI
+    train = 1000,
+    # ABC
+    reduction = "PCA", #ncomp = 6,
+    # RNN
+    info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize")
   )
 )
 
-save(recovery, file = "../OUTPUT/recovery.WM.Rdata")
+save(recovery, file = "../OUTPUT/recovery.WMbonus.Rdata")
 ```
 
 ```{r}
@@ -176,15 +189,15 @@ replay.recovery <- multiRL::rpl_e(
   omit = c("data", "funcs")
 )
   
-save(replay.recovery, file = "../OUTPUT/replay.recovery.WM.Rdata")
+save(replay.recovery, file = "../OUTPUT/replay.recovery.WMbonus.Rdata")
 
 p <- plot(x = replay.recovery)
 ggplot2::ggsave(
-  plot = p$param[[1]]$zeta, filename = "../WM_zeta.png",
+  plot = p$param[[1]]$zeta, filename = "../WMbonus_zeta.png",
   width = 5, height = 5
 )
 ggplot2::ggsave(
-  plot = p$param[[1]]$beta, filename = "../WM_beta.png",
+  plot = p$param[[1]]$beta, filename = "../WMbonus_beta.png",
   width = 5, height = 5
 )
 
@@ -206,7 +219,7 @@ fitting <- multiRL::fit_p(
   priors = list(
     list(
       zeta = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)}, 
-      beta = function(x) {stats::rexp(n = 1, rate = 1)}
+      beta = function(x) {stats::rexp(n = 1, rate = 0.1)}
     )
   ),
   settings = list(list(name = "WM", system = "WM")),
@@ -221,13 +234,13 @@ fitting <- multiRL::fit_p(
     # SBI
     train = 1000,
     # ABC
-    reduction = "PCA", #ncomp = 6,
+    reduction = "PCA", ncomp = 6,
     # RNN
     info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize")
   )
 )
 
-save(fitting, file = "../OUTPUT/fitting.WM.Rdata")
+save(fitting, file = "../OUTPUT/fitting.WMbonus.Rdata")
 ```
 
 ## WM(replay)
@@ -248,13 +261,13 @@ replay.fitting <- multiRL::rpl_e(
 )
 
 #p <- plot(replay.fitting)
-#ggplot2::ggsave(filename = "../fitting_WM.png", width = 40, height = 5)
+#ggplot2::ggsave(filename = "../fitting_WMbonus.png", width = 40, height = 5)
 
-save(replay.fitting, file = "../OUTPUT/replay.fitting.WM.Rdata")
+save(replay.fitting, file = "../OUTPUT/replay.fitting.WMbonus.Rdata")
 ```
 
 ```{r}
-#load("../OUTPUT/replay.fitting.WM.Rdata")
+#load("../OUTPUT/replay.fitting.WMbonus.Rdata")
 
 data_fitting <- base::do.call(
   base::rbind,
@@ -269,12 +282,12 @@ data_fitting <- base::do.call(
 p <- extract_setsize_history(data_fitting)
 plot_setsize_analysis(p)
 
-ggplot2::ggsave(filename = "../SetSize_Effect_WM.png", width = 8, height = 6)
+ggplot2::ggsave(filename = "../SetSize_Effect_WMbonus.png", width = 8, height = 6)
 rm(p)
 ```
 
 ```{r}
-#load("../OUTPUT/replay.fitting.WM.Rdata")
+#load("../OUTPUT/replay.fitting.WMbonus.Rdata")
 
 data_fitting <- base::do.call(
   base::rbind,
@@ -289,7 +302,9 @@ data_fitting <- base::do.call(
 p <- extract_error_history(data_fitting, "Simulation")
 plot_error_analysis(p)
 
-ggplot2::ggsave(filename = "../Error_Effect_WM.png", width = 8, height = 6)
+ggplot2::ggsave(filename = "../Error_Effect_WMbonus.png", width = 8, height = 6)
 
 rm(p)
 ```
+
+

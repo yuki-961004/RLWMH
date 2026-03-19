@@ -1,105 +1,55 @@
----
-title: "Untitled"
-author: "yuki"
-date: "2026-03-06"
-output: html_document
----
-## Human
-
-```{r}
-load("../OUTPUT/fitting.TD.Rdata")
-```
-
-```{r}
-replay.fitting <- multiRL::rpl_e(
-  result = fitting,
-
-  data = data,
-  behrule = behrule,
-  colnames = colnames,
+# plot functions
+extract_setsize_history <- function(df) {
+  data_fitting <- df |>
+    dplyr::select(
+      Subject, SetSize, Stim_Count, Reward
+    ) |>
+    dplyr::group_by(Subject, SetSize, Stim_Count) |>
+    dplyr::summarise(Acc = mean(Reward)) |>
+    dplyr::ungroup()
   
-  models = list(multiRL::TD),
-  # policy = "off" (Human)
-  settings = list(name = c("TD"), policy = "off"),
-
-  omit = c("funcs")
-)
-
-#save(replay.fitting, file = "../OUTPUT/replay.fitting.Human.Rdata")
-
-```
-
-```{r}
-load("../OUTPUT/0_Human/replay.fitting.Human.Rdata")
-```
-
-```{r}
-data_raw <- base::do.call(
-  base::rbind,
-  base::lapply(
-    replay.fitting[["TD"]],
-    function(subject) {
-      subject[["multiRL.summary"]]@data
+  # 计算每个 SetSize 在每个 Stim_Count 下的均值和标准误
+  data_fitting <- stats::aggregate(
+    Acc ~ Stim_Count + SetSize,
+    data = data_fitting,
+    FUN = function(x) {
+      c(mean = base::mean(x), se = stats::sd(x) / base::sqrt(base::length(x)))
     }
   )
-) |>
-  dplyr::select(
-    Subject, SetSize, Stim_Count, Reward
-  ) |>
-  dplyr::group_by(Subject, SetSize, Stim_Count) |>
-  dplyr::summarise(Acc = mean(Reward)) |>
-  dplyr::ungroup()
-
-# 计算每个 SetSize 在每个 Stim_Count 下的均值和标准误
-data_raw <- stats::aggregate(
-  Acc ~ Stim_Count + SetSize,
-  data = data_raw,
-  FUN = function(x) {
-    c(mean = base::mean(x), se = stats::sd(x) / base::sqrt(base::length(x)))
-  }
-)
-
-# 将 aggregate 的 matrix 结果展开为列
-data_raw <- base::do.call(base::data.frame, data_raw)
-base::colnames(data_raw) <- c("Stim_Count", "SetSize", "Acc", "SE")
-```
-
-```{r}
-ggplot2::ggplot(
-  data = data_raw,
-  mapping = ggplot2::aes(
-    x = Stim_Count,
-    y = Acc,
-    color = base::as.factor(SetSize),
-    group = SetSize
-  )
-) +
-  ggplot2::geom_line(size = 0.8) +
-  ggplot2::geom_point(size = 2) +
-  ggplot2::scale_x_continuous(breaks = 1:15) +
-  ggplot2::scale_y_continuous(limits = c(0, 1)) +
-  ggplot2::geom_errorbar(
-    ggplot2::aes(ymin = Acc - SE, ymax = Acc + SE),
-    width = 0.2
-  ) +
-  ggplot2::labs(
-    x = "Iteration (Stim_Count)",
-    y = "Accuracy (Acc)",
-    color = "Set Size"
-  ) +
-  papaja::theme_apa()
   
-ggplot2::ggsave(filename = "../Exp_Effect_Human.png", width = 8, height = 6)
-```
+  # 将 aggregate 的 matrix 结果展开为列
+  data_fitting <- base::do.call(base::data.frame, data_fitting)
+  base::colnames(data_fitting) <- c("Stim_Count", "SetSize", "Acc", "SE")
+  
+  return(data_fitting)
+}
 
-### Figure 2 (error)
+plot_setsize_analysis <- function(df_setsize){
+  df_setsize |>
+    ggplot2::ggplot(
+      mapping = ggplot2::aes(
+        x = Stim_Count,
+        y = Acc,
+        color = base::as.factor(SetSize),
+        group = SetSize
+      )
+    ) +
+    ggplot2::geom_line(linewidth = 0.8) +
+    ggplot2::geom_point(size = 2) +
+    ggplot2::scale_x_continuous(breaks = 1:15) +
+    ggplot2::scale_y_continuous(limits = c(0, 1)) +
+    ggplot2::geom_errorbar(
+      ggplot2::aes(ymin = Acc - SE, ymax = Acc + SE),
+      width = 0.2
+    ) +
+    ggplot2::labs(
+      x = "Iteration (Stim_Count)",
+      y = "Accuracy (Acc)",
+      color = "Set Size"
+    ) +
+    papaja::theme_apa()
+}
 
-```{r}
-#load("../OUTPUT/replay.fitting.RLWM.Rdata")
-
-# 数据转化函数：提取错误试次并计算历史频次
-# 数据转化函数：支持动态指定目标动作列
-# 数据转化函数：剔除第一次遇到刺激的试次
 extract_error_history <- function(df, target_col) {
   df |>
     dplyr::mutate(
@@ -193,23 +143,3 @@ plot_error_analysis <- function(df_errors) {
       color = "Error Type"
     )
 }
-```
-
-```{r}
-data_fitting <- base::do.call(
-  base::rbind,
-  base::lapply(
-    replay.fitting[[1]],
-    function(subject) {
-      subject[["multiRL.summary"]]@data
-    }
-  )
-) 
-
-p <- extract_error_history(data_fitting, "Action")
-plot_error_analysis(p)
-
-ggplot2::ggsave(filename = "../Error_Effect_Human.png", width = 8, height = 6)
-
-rm(p)
-```

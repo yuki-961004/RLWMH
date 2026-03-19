@@ -27,91 +27,77 @@ Any novel findings or insights discovered during this process will be documented
 +------------------------------+
 ```
 
-In each trial, an image is presented, and participants choose between three different response keys. A correct response results in a reward of 1, whereas an incorrect response yields a reward of 0. The working memory load scales up across blocks as the set size (number of stimuli) increases.
+In each trial, an image is presented, and participants choose between **three different response keys**. A **correct** response results in a **reward of 1**, whereas an **incorrect** response yields a **reward of 0**. The working memory load scales up across blocks as the **set size** (number of stimuli) increases.
 
-<p align="center">
-    <img src="./FIGURE/Exp_Effect_Human.png" alt="arrow" width="80%" style="display: inline;">
-</p>
-
-We have developed three computational models:
-
-1. A standard TD model, featuring only the learning rate and inverse temperature as free parameters.
-
-2. A WM model, where the learning rate is fixed at 1 to represent the exclusive involvement of the working memory system. The free parameters include the decay rate and inverse temperature.
-
-3. An RLWM model, in which the learning rate for the RL system remains a free parameter, while the WM system's learning rate is fixed at 1. The relative contribution of these two systems is controlled by a 'weight' parameter. Notably, decay rate and capacity were excluded as they failed to yield acceptable parameter recovery.
-
-However, none of the aforementioned models successfully replicate the experimental effects observed in human subjects.
+**Tips**
+1. Since any number raised to the power of zero is one, the h-agent model can be conceptualized as a utility function under Stevens' Power Law where the exponent `gamma` is fixed at `0`.
+2. UCB can't be applied to this paradigm, so `delta` needs to be fixed at `0`. Since there are only three actions (J, K, L) for each image, once the correct option is found, there's no need to explore the others.
+3. Each block features a new image, so we need a `reset`. With only three options available, the initial Q-value (`Q0`) and the `reset` value should both be `0.33`.
+4. Since we aren't learning the expected value of a bandit, the inverse temperature parameter should be quite high. I suggest setting the `rate` to `0.1` and the search range is `(0, 50)`.
 
 ## Model
 
-### TD
+<p align="center">
+    <img src="./models.png" alt="arrow" width="80%" style="display: inline;">
+</p>
 
-```r
-TD <- function(params){
-  ...
-  params <- list(
-    free = list(alpha = params[1], beta = params[2]),
-    fixed = list(Q0 = 0.5),
-    constant = list(reset = 0.5)
-  )
-  ...
-}
-```
+---
 
 <p align="center">
-    <img src="./FIGURE/ABC/PCA/TD_alpha.png" alt="arrow" width="40%" style="display: inline;">
-    <img src="./FIGURE/ABC/PCA/TD_beta.png" alt="arrow" width="40%" style="display: inline;">
+    <img src="./FIGURE/Human/SetSize_Effect_Human.png" alt="arrow" width="40%" style="display: inline;">
+    <img src="./FIGURE/Human/Error_Effect_Human.png" alt="arrow" width="40%" style="display: inline;">
+</p>
+
+---
+
+<p align="center">
+  <img src="./FIGURE/SetSize_Effect_TD.png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_TD(decay).png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_WM.png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_WM(bonus).png" alt="arrow" width="17%" style="display: inline;">
 </p>
 
 <p align="center">
-    <img src="./FIGURE/Exp_Effect_TD.png" alt="arrow" width="80%" style="display: inline;">
-</p>
-
-### WM
-
-```r
-WM <- function(params){
-  ...
-  params <- list(
-    free = list(zeta = params[1], beta = params[2]),
-    fixed = list(Q0 = 0.5, alpha = 1, weight = 1),
-    constant = list(reset = 0.5)
-  )
-  ...
-}
-```
-
-<p align="center">
-    <img src="./FIGURE/2_WM/WM_zeta.png" alt="arrow" width="40%" style="display: inline;">
-    <img src="./FIGURE/2_WM/WM_beta.png" alt="arrow" width="40%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_RLWM_3.png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_RLWM_4(-decay).png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_RLWM_4(-weight).png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_RLWM_4(-capacity).png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_RLWM_5.png" alt="arrow" width="17%" style="display: inline;">
 </p>
 
 <p align="center">
-    <img src="./FIGURE/Exp_Effect_WM.png" alt="arrow" width="80%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_HWM_3.png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_HWM_4(-decay).png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_HWM_4(-weight).png" alt="arrow" width="17%" style="display: inline; border: 2px solid #FFD700; padding: 8px; box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);">
+  <img src="./FIGURE/SetSize_Effect_HWM_4(-capacity).png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_HWM_5.png" alt="arrow" width="17%" style="display: inline;">
 </p>
 
-### RLWM
-
-```r
-RLWM <- function(params){
-  ...
-  params <- list(
-    free = list(zeta = params[1], beta = params[2], weight = params[3]),
-    fixed = list(Q0 = 0.5),
-    constant = list(reset = 0.5)
-  )
-  ...
-}
-```
+---
 
 <p align="center">
-    <img src="./FIGURE/3_RLWM/RLWM_alpha.png" alt="arrow" width="26%" style="display: inline;">
-    <img src="./FIGURE/3_RLWM/RLWM_beta.png" alt="arrow" width="26%" style="display: inline;">
-    <img src="./FIGURE/3_RLWM/RLWM_weight.png" alt="arrow" width="26%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_TD.png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_TD(decay).png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_WM.png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_WM(bonus).png" alt="arrow" width="17%" style="display: inline;">
 </p>
 
 <p align="center">
-    <img src="./FIGURE/Exp_Effect_RLWM.png" alt="arrow" width="80%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_RLWM_3.png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_RLWM_4(-decay).png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_RLWM_4(-weight).png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_RLWM_4(-capacity).png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_RLWM_5.png" alt="arrow" width="17%" style="display: inline;">
 </p>
 
+<p align="center">
+  <img src="./FIGURE/Error_Effect_HWM_3.png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_HWM_4(-decay).png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_HWM_4(-weight).png" alt="arrow" width="17%" style="display: inline; border: 2px solid #FFD700; padding: 8px; box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);">
+  <img src="./FIGURE/Error_Effect_HWM_4(-capacity).png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_HWM_5.png" alt="arrow" width="17%" style="display: inline;">
+</p>
+
+---
+
+The optimal model should be the one capable of reproducing both experimental effect plots (setsize & error). Currently, `HWM_4(-weight)` stands out as the best model, incorporating four free parameters: `alpha`, `beta`, `zeta`, and `capacity`.
