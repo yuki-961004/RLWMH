@@ -29,26 +29,28 @@ Any novel findings or insights discovered during this process will be documented
 
 In each trial, an image is presented, and participants choose between **three different response keys**. A **correct** response results in a **reward of 1**, whereas an **incorrect** response yields a **reward of 0**. The working memory load scales up across blocks as the **set size** (number of stimuli) increases.
 
-**Tips**
-1. Since any number raised to the power of zero is one, the h-agent model can be conceptualized as a utility function under Stevens' Power Law where the exponent `gamma` is fixed at `0`.
-2. UCB can't be applied to this paradigm, so `delta` needs to be fixed at `0`. Since there are only three actions (J, K, L) for each image, once the correct option is found, there's no need to explore the others.
-3. Each block features a new image, so we need a `reset`. With only three options available, the initial Q-value (`Q0`) and the `reset` value should both be `0.33`.
-4. Since we aren't learning the expected value of a bandit, the inverse temperature parameter should be quite high. I suggest setting the `rate` to `0.1` and the search range is `(0, 50)`.
-
 ## Model
 
 <p align="center">
     <img src="./models.png" alt="arrow" width="80%" style="display: inline;">
 </p>
 
+**Note**
+1. Since any number raised to the power of zero is one, the H-agent model can be conceptualized as a utility function under Stevens' Power Law where the exponent `gamma` is fixed at `0`.
+2. Upper-Confidence-Bound cannot be applied to this paradigm, so `delta` needs to be fixed at `0`. Since there are only three actions (J, K, L) for each image, once the correct option is found, there's no need to explore the others.
+3. Each block features a new image, so we need a `reset`. With only three options available, the initial Q-value (`Q0`) and the `reset` value should both be `0.33`.
+4. Since we aren't learning the expected value of a bandit, the inverse temperature parameter should be quite high. I suggest setting the `rate` to `0.1` and the search range is `(0, 50)`.
+
 ---
+
+### Target Experiment Effect
 
 <p align="center">
     <img src="./FIGURE/Human/SetSize_Effect_Human.png" alt="arrow" width="40%" style="display: inline;">
     <img src="./FIGURE/Human/Error_Effect_Human.png" alt="arrow" width="40%" style="display: inline;">
 </p>
 
----
+#### SetSize Effect
 
 <p align="center">
   <img src="./FIGURE/SetSize_Effect_TD.png" alt="arrow" width="17%" style="display: inline;">
@@ -58,22 +60,22 @@ In each trial, an image is presented, and participants choose between **three di
 </p>
 
 <p align="center">
-  <img src="./FIGURE/SetSize_Effect_RLWM_3.png" alt="arrow" width="17%" style="display: inline;">
-  <img src="./FIGURE/SetSize_Effect_RLWM_4(-decay).png" alt="arrow" width="17%" style="display: inline;">
-  <img src="./FIGURE/SetSize_Effect_RLWM_4(-weight).png" alt="arrow" width="17%" style="display: inline;">
-  <img src="./FIGURE/SetSize_Effect_RLWM_4(-capacity).png" alt="arrow" width="17%" style="display: inline;">
-  <img src="./FIGURE/SetSize_Effect_RLWM_5.png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_RLWM_3.png" alt="arrow" width="15%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_RLWM_4(-decay).png" alt="arrow" width="15%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_RLWM_4(-weight).png" alt="arrow" width="15%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_RLWM_4(-capacity).png" alt="arrow" width="15%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_RLWM_5.png" alt="arrow" width="15%" style="display: inline;">
 </p>
 
 <p align="center">
-  <img src="./FIGURE/SetSize_Effect_HWM_3.png" alt="arrow" width="17%" style="display: inline;">
-  <img src="./FIGURE/SetSize_Effect_HWM_4(-decay).png" alt="arrow" width="17%" style="display: inline;">
-  <img src="./FIGURE/SetSize_Effect_HWM_4(-weight).png" alt="arrow" width="17%" style="display: inline; border: 2px solid #FFD700; padding: 8px; box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);">
-  <img src="./FIGURE/SetSize_Effect_HWM_4(-capacity).png" alt="arrow" width="17%" style="display: inline;">
-  <img src="./FIGURE/SetSize_Effect_HWM_5.png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_HWM_3.png" alt="arrow" width="15%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_HWM_4(-decay).png" alt="arrow" width="15%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_HWM_4(-weight).png" alt="arrow" width="20%" style="display: inline; border: 2px solid #FFD700; padding: 8px; box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);">
+  <img src="./FIGURE/SetSize_Effect_HWM_4(-capacity).png" alt="arrow" width="15%" style="display: inline;">
+  <img src="./FIGURE/SetSize_Effect_HWM_5.png" alt="arrow" width="15%" style="display: inline;">
 </p>
 
----
+### Error Effect
 
 <p align="center">
   <img src="./FIGURE/Error_Effect_TD.png" alt="arrow" width="17%" style="display: inline;">
@@ -83,21 +85,36 @@ In each trial, an image is presented, and participants choose between **three di
 </p>
 
 <p align="center">
-  <img src="./FIGURE/Error_Effect_RLWM_3.png" alt="arrow" width="17%" style="display: inline;">
-  <img src="./FIGURE/Error_Effect_RLWM_4(-decay).png" alt="arrow" width="17%" style="display: inline;">
-  <img src="./FIGURE/Error_Effect_RLWM_4(-weight).png" alt="arrow" width="17%" style="display: inline;">
-  <img src="./FIGURE/Error_Effect_RLWM_4(-capacity).png" alt="arrow" width="17%" style="display: inline;">
-  <img src="./FIGURE/Error_Effect_RLWM_5.png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_RLWM_3.png" alt="arrow" width="15%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_RLWM_4(-decay).png" alt="arrow" width="15%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_RLWM_4(-weight).png" alt="arrow" width="15%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_RLWM_4(-capacity).png" alt="arrow" width="15%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_RLWM_5.png" alt="arrow" width="15%" style="display: inline;">
 </p>
 
 <p align="center">
-  <img src="./FIGURE/Error_Effect_HWM_3.png" alt="arrow" width="17%" style="display: inline;">
-  <img src="./FIGURE/Error_Effect_HWM_4(-decay).png" alt="arrow" width="17%" style="display: inline;">
-  <img src="./FIGURE/Error_Effect_HWM_4(-weight).png" alt="arrow" width="17%" style="display: inline; border: 2px solid #FFD700; padding: 8px; box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);">
-  <img src="./FIGURE/Error_Effect_HWM_4(-capacity).png" alt="arrow" width="17%" style="display: inline;">
-  <img src="./FIGURE/Error_Effect_HWM_5.png" alt="arrow" width="17%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_HWM_3.png" alt="arrow" width="15%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_HWM_4(-decay).png" alt="arrow" width="15%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_HWM_4(-weight).png" alt="arrow" width="20%" style="display: inline; border: 2px solid #FFD700; padding: 8px; box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);">
+  <img src="./FIGURE/Error_Effect_HWM_4(-capacity).png" alt="arrow" width="15%" style="display: inline;">
+  <img src="./FIGURE/Error_Effect_HWM_5.png" alt="arrow" width="15%" style="display: inline;">
 </p>
 
----
+The optimal model should be the one capable of reproducing both experimental effect plots (setsize & error). Currently, `HWM_4(-weight)` stands out as the best model, incorporating four free parameters: `alpha`(learning rate), `beta`(inverse temperature), `zeta`(decay rate), and `capacity`(capacity-limited working memory). Instead of using a `weight` parameter, this model directly uses the ratio of set size over capacity to determine the probability of disregarding the WM system. Additionally, the model excludes the `sticky` parameter, and the `lapse` rate is fixed at 0.01. 
 
-The optimal model should be the one capable of reproducing both experimental effect plots (setsize & error). Currently, `HWM_4(-weight)` stands out as the best model, incorporating four free parameters: `alpha`, `beta`, `zeta`, and `capacity`.
+```r
+overload  <- min(1, capacity / setsize)
+rho <- c(1 - overload, overload)
+```
+
+### RLWMH
+
+Differences from the original best-fitting model:
+1. `beta` (inverse temperature) is treated as a free parameter rather than being fixed at 25.
+2. `alphaN`, `alphaP`. We do not distinguish between learning rates for positive and negative prediction errors (i.e., when reward is greater or less than expectation). This is because the **H agent** module fixes the reward at 1, ensuring it is always greater than or equal to the expected value.
+
+<p align="center">
+    <img src="./FIGURE/SetSize_Effect_RLWMH.png" alt="arrow" width="40%" style="display: inline;">
+    <img src="./FIGURE/Error_Effect_RLWMH.png" alt="arrow" width="40%" style="display: inline;">
+</p>
+
