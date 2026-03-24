@@ -282,7 +282,7 @@ data_fitting <- base::do.call(
 p <- extract_setsize_history(data_fitting)
 plot_setsize_analysis(p)
 
-ggplot2::ggsave(filename = "../SetSize_Effect_WMbonus.png", width = 8, height = 6)
+ggplot2::ggsave(filename = "../SetSize_Effect_WM(bonus).png", width = 8, height = 6)
 rm(p)
 ```
 
@@ -302,7 +302,7 @@ data_fitting <- base::do.call(
 p <- extract_error_history(data_fitting, "Simulation")
 plot_error_analysis(p)
 
-ggplot2::ggsave(filename = "../Error_Effect_WMbonus.png", width = 8, height = 6)
+ggplot2::ggsave(filename = "../Error_Effect_WM(bonus).png", width = 8, height = 6)
 
 rm(p)
 ```

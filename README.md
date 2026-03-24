@@ -75,7 +75,7 @@ In each trial, an image is presented, and participants choose between **three di
   <img src="./FIGURE/SetSize_Effect_HWM_5.png" alt="arrow" width="15%" style="display: inline;">
 </p>
 
-### Error Effect
+#### Error Effect
 
 <p align="center">
   <img src="./FIGURE/Error_Effect_TD.png" alt="arrow" width="17%" style="display: inline;">

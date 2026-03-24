@@ -206,7 +206,7 @@ reticulate::use_condaenv(condaenv = "tf-gpu", required = TRUE)
 
 ```{r}
 recovery <- multiRL::rcv_d(
-  estimate = "MLE",
+  estimate = "ABC",
   algorithm = "NLOPT_GN_MLSL",
   
   data = data,

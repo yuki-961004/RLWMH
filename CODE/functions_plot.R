@@ -133,8 +133,8 @@ plot_error_analysis <- function(df_errors) {
       width = 0.2
     ) +
     ggplot2::scale_y_continuous(
-      limits = c(0, 1.75), 
-      breaks = seq(from = 0, to = 1.75, by = 0.25)
+      limits = c(0, 2), 
+      breaks = seq(from = 0, to = 2, by = 0.25)
     ) +
     ggplot2::theme_classic() +
     ggplot2::labs(
