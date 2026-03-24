@@ -40,6 +40,7 @@ In each trial, an image is presented, and participants choose between **three di
 2. Upper-Confidence-Bound cannot be applied to this paradigm, so `delta` needs to be fixed at `0`. Since there are only three actions (J, K, L) for each image, once the correct option is found, there's no need to explore the others.
 3. Each block features a new image, so we need a `reset`. With only three options available, the initial Q-value (`Q0`) and the `reset` value should both be `0.33`.
 4. Since we aren't learning the expected value of a bandit, the inverse temperature parameter should be quite high. I suggest setting the `rate` to `0.1` and the search range is `(0, 50)`.
+5. Technically, picking the correct option should reset the values of all other choices to zero. But since removing this `bonus` didn’t really affect the behavioral plots, I eventually decided to drop it to keep the model simpler.
 
 ---
 

@@ -127,9 +127,9 @@ dcay_wm <- function(
   } else if (system == "WM") {
     decay <- values + zeta * (value0 - values)
     
-    if (reward == 1) {
-      decay <- ifelse(test = is.na(shown), yes = decay, no = 0)
-    } 
+    # if (reward == 1) {
+    #   decay <- ifelse(test = is.na(shown), yes = decay, no = 0)
+    # } 
   }
   
   return(decay)
