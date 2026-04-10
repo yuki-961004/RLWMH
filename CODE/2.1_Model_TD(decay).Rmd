@@ -39,7 +39,7 @@ source("./functions_plot.R")
 ```
 
 
-## TD(test)
+## test
 
 ```{r}
 dcay_td <- function(
@@ -76,10 +76,10 @@ multiRL.model <- multiRL::run_m(
   colnames = colnames,
   params = list(
     free = list(
-      alpha = 0.6, beta = 20,
+      alpha = 0.6, 
       zeta = 0.1
     ),
-    fixed = list(delta = 0),
+    fixed = list(beta = 25, delta = 0),
     constant = list(Q0 = 0.33, reset = 0.33)
   ),
   priors = list(),
@@ -95,17 +95,17 @@ multiRL.model <- multiRL::run_m(
 multiRL.summary <- multiRL::summary(multiRL.model)
 ```
 
-## TD(model)
+## create
 
 ```{r}
 TD <- function(params){
   
   params <- list(
     free = list(
-      alpha = params[1], beta = params[2],
-      zeta = params[3]
+      alpha = params[1], 
+      zeta = params[2]
     ),
-    fixed = list(delta = 0),
+    fixed = list(beta = 25, delta = 0),
     constant = list(Q0 = 0.33, reset = 0.33)
   )
 
@@ -125,7 +125,7 @@ TD <- function(params){
 
 ```
 
-## TD(recovery)
+## recovery
 
 ```{r}
 reticulate::use_condaenv(condaenv = "tf-gpu", required = TRUE)
@@ -144,15 +144,14 @@ recovery <- multiRL::rcv_d(
   priors = list(
     list(
       alpha = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)}, 
-      beta = function(x) {stats::rexp(n = 1, rate = 1)},
       zeta = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)}
     )
   ),
   settings = list(list(name = "TD")),
   funcs = list(list(dcay_func = dcay_td)),
   
-  lowers = list(c(0, 0, 0)),
-  uppers = list(c(1, 10, 1)),
+  lowers = list(c(0, 0)),
+  uppers = list(c(1, 1)),
   control = list(
     core = 10, sample = 100, 
     # LBI
@@ -162,11 +161,12 @@ recovery <- multiRL::rcv_d(
     # ABC
     reduction = "PCA", #ncomp = 6,
     # RNN
-    info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize")
+    info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize"),
+    loss = "MDN", L = 2, check = FALSE
   )
 )
 
-save(recovery, file = "../OUTPUT/recovery.TDecay.Rdata")
+save(recovery, file = "../OUTPUT/recovery.TD(decay).Rdata")
 ```
 
 ```{r}
@@ -178,31 +178,27 @@ replay.recovery <- multiRL::rpl_e(
   colnames = colnames,
   
   models = list(TD),
-  settings = list(name = c("TD")),
   funcs = list(list(dcay_func = dcay_td)),
+  settings = list(name = c("TD")),
 
   omit = c("data", "funcs")
 )
   
-save(replay.recovery, file = "../OUTPUT/replay.recovery.TDecay.Rdata")
+save(replay.recovery, file = "../OUTPUT/replay.recovery.TD(decay).Rdata")
 
 p <- plot(x = replay.recovery)
 ggplot2::ggsave(
-  plot = p$param[[1]]$alpha, filename = "../TDecay_alpha.png",
+  plot = p$param[[1]]$alpha, filename = "../TD(decay)_alpha.png",
   width = 5, height = 5
 )
 ggplot2::ggsave(
-  plot = p$param[[1]]$beta, filename = "../TDecay_beta.png",
-  width = 5, height = 5
-)
-ggplot2::ggsave(
-  plot = p$param[[1]]$zeta, filename = "../TDecay_zeta.png",
+  plot = p$param[[1]]$zeta, filename = "../TD(decay)_zeta.png",
   width = 5, height = 5
 )
 rm(p)
 ```
 
-## TD(fitting)
+## fitting
 
 ```{r}
 fitting <- multiRL::fit_p(
@@ -242,7 +238,7 @@ fitting <- multiRL::fit_p(
 save(fitting, file = "../OUTPUT/fitting.TD(decay).Rdata")
 ```
 
-## TD(replay)
+## replay
 
 ```{r}
 replay.fitting <- multiRL::rpl_e(

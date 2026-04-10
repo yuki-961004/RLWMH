@@ -1,0 +1,260 @@
+---
+title: "Untitled"
+author: "yuki"
+date: "2026-02-13"
+output: html_document
+---
+
+## load
+
+```{r setup}
+load("../DATA/data1.Rdata")
+
+behrule = list(
+  cue = c(
+    "AJ", "AK", "AL", 
+    "BJ", "BK", "BL", 
+    "CJ", "CK", "CL", 
+    "DJ", "DK", "DL", 
+    "EJ", "EK", "EL", 
+    "FJ", "FK", "FL"
+  ),
+  rsp = c(
+    "AJ", "AK", "AL", 
+    "BJ", "BK", "BL", 
+    "CJ", "CK", "CL", 
+    "DJ", "DK", "DL", 
+    "EJ", "EK", "EL", 
+    "FJ", "FK", "FL"
+  )
+)
+colnames = list(
+  subid = "Subject", block = "Block", trial = "Trial",
+  object = c("Object_1", "Object_2", "Object_3"),
+  reward = c("Reward_1", "Reward_2", "Reward_3"),
+  action = "Action",
+  exinfo = c("SetSize")
+)
+source("./functions_plot.R")
+```
+
+
+## test
+
+```{r}
+multiRL.model <- multiRL::run_m(
+  data = data[data[, "Subject"] == 1, ],
+  behrule = behrule,
+  colnames = colnames,
+  params = list(
+    free = list(
+      alpha = 0.6
+    ),
+    fixed = list(beta = 25, delta = 0, gamma = 0),
+    constant = list(Q0 = 0.33, reset = 0.33)
+  ),
+  priors = list(),
+  settings = list(
+    name = "H",
+    mode = "fitting",
+    estimate = "MLE",
+    policy = "on"
+  )
+)
+
+multiRL.summary <- multiRL::summary(multiRL.model)
+```
+
+## creat
+
+```{r}
+H <- function(params){
+  
+  params <- list(
+    free = list(alpha = params[1]),
+    fixed = list(beta = 25, delta = 0, gamma = 0),
+    constant = list(Q0 = 0.33, reset = 0.33)
+  )
+
+  multiRL.model <- multiRL::run_m(
+    data = data,
+    behrule = behrule,
+    colnames = colnames,
+    params = params,
+    funcs = funcs,
+    priors = priors,
+    settings = settings
+  )
+  
+  assign(x = "multiRL.model", value = multiRL.model, envir = multiRL.env)
+  return(.return_result(multiRL.model))
+}
+
+```
+
+## recovery
+
+```{r}
+reticulate::use_condaenv(condaenv = "tf-gpu", required = TRUE)
+```
+
+```{r}
+recovery <- multiRL::rcv_d(
+  estimate = "RNN",
+  algorithm = "NLOPT_GN_MLSL",
+  
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+
+  models = list(H),
+  priors = list(
+    list(
+      alpha = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)}
+    )
+  ),
+  settings = list(list(name = "H")),
+  
+  lowers = list(c(0)),
+  uppers = list(c(1)),
+  control = list(
+    core = 10, sample = 100, 
+    # LBI
+    iter = 100,
+    # SBI
+    train = 1000,
+    # ABC
+    reduction = "PLS", #ncomp = 6,
+    # RNN
+    info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize"),
+    loss = "MDN", L = 2, check = FALSE
+  )
+)
+
+save(recovery, file = "../OUTPUT/recovery.H.Rdata")
+```
+
+```{r}
+replay.recovery <- multiRL::rpl_e(
+  result = recovery,
+
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+  
+  models = list(H),
+  settings = list(name = c("H")),
+
+  omit = c("data", "funcs")
+)
+  
+save(replay.recovery, file = "../OUTPUT/replay.recovery.H.Rdata")
+
+p <- plot(x = replay.recovery)
+ggplot2::ggsave(
+  plot = p$param[[1]]$alpha, filename = "../H_alpha.png",
+  width = 5, height = 5
+)
+rm(p)
+```
+
+## fit
+
+```{r}
+fitting <- multiRL::fit_p(
+  estimate = "MLE",
+  algorithm = "NLOPT_GN_MLSL",
+  
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+
+  models = list(H),
+  priors = list(
+    list(
+      alpha = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)}, 
+      beta = function(x) {stats::rexp(n = 1, rate = 0.1)}
+    )
+  ),
+  settings = list(list(name = "H")),
+  
+  lowers = list(c(0, 0)),
+  uppers = list(c(1, 50)),
+  control = list(
+    core = 10, sample = 100, 
+    # LBI
+    iter = 100,
+    # SBI
+    train = 1000,
+    # ABC
+    reduction = "PCA", #ncomp = 6,
+    # RNN
+    info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize")
+  )
+)
+
+save(fitting, file = "../OUTPUT/fitting.TD.Rdata")
+```
+
+```{r}
+replay.fitting <- multiRL::rpl_e(
+  result = fitting,
+
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+  
+  models = list(TD),
+  settings = list(name = c("TD")),
+
+  omit = c("funcs")
+)
+
+#p <- plot(replay.fitting)
+#ggplot2::ggsave(filename = "../TD_fitting.png", width = 40, height = 5)
+
+save(replay.fitting, file = "../OUTPUT/replay.fitting.TD.Rdata")
+```
+
+## plot
+
+```{r}
+#load("../OUTPUT/replay.fitting.TD.Rdata")
+
+data_fitting <- base::do.call(
+  base::rbind,
+  base::lapply(
+    replay.fitting[[1]],
+    function(subject) {
+      subject[["multiRL.summary"]]@data
+    }
+  )
+)
+
+p <- extract_setsize_history(data_fitting)
+plot_setsize_analysis(p)
+
+ggplot2::ggsave(filename = "../SetSize_Effect_TD.png", width = 8, height = 6)
+rm(p)
+```
+
+```{r}
+#load("../OUTPUT/replay.fitting.TD.Rdata")
+
+data_fitting <- base::do.call(
+  base::rbind,
+  base::lapply(
+    replay.fitting[[1]],
+    function(subject) {
+      subject[["multiRL.summary"]]@data
+    }
+  )
+)
+
+p <- extract_error_history(data_fitting, "Simulation")
+plot_error_analysis(p)
+
+ggplot2::ggsave(filename = "../Error_Effect_TD.png", width = 8, height = 6)
+
+rm(p)
+```

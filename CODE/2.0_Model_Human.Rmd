@@ -7,50 +7,36 @@ output: html_document
 ## Human
 
 ```{r}
-load("../OUTPUT/fitting.TD.Rdata")
-```
+load("../OUTPUT/Human/replay.fitting.Human.Rdata")
 
-```{r}
-replay.fitting <- multiRL::rpl_e(
-  result = fitting,
+load("../DATA/data1.Rdata")
 
-  data = data,
-  behrule = behrule,
-  colnames = colnames,
-  
-  models = list(multiRL::TD),
-  # policy = "off" (Human)
-  settings = list(name = c("TD"), policy = "off"),
-
-  omit = c("funcs")
-)
-
-#save(replay.fitting, file = "../OUTPUT/replay.fitting.Human.Rdata")
-
-```
-
-```{r}
-load("../OUTPUT/0_Human/replay.fitting.Human.Rdata")
-```
-
-```{r}
-#load("../OUTPUT/replay.fitting.Human.Rdata")
-
-data_fitting <- base::do.call(
-  base::rbind,
-  base::lapply(
-    replay.fitting[[1]],
-    function(subject) {
-      subject[["multiRL.summary"]]@data
-    }
+behrule = list(
+  cue = c(
+    "AJ", "AK", "AL", 
+    "BJ", "BK", "BL", 
+    "CJ", "CK", "CL", 
+    "DJ", "DK", "DL", 
+    "EJ", "EK", "EL", 
+    "FJ", "FK", "FL"
+  ),
+  rsp = c(
+    "AJ", "AK", "AL", 
+    "BJ", "BK", "BL", 
+    "CJ", "CK", "CL", 
+    "DJ", "DK", "DL", 
+    "EJ", "EK", "EL", 
+    "FJ", "FK", "FL"
   )
 )
-
-p <- extract_setsize_history(data_fitting)
-plot_setsize_analysis(p)
-
-ggplot2::ggsave(filename = "../SetSize_Effect_Human.png", width = 8, height = 6)
-rm(p)
+colnames = list(
+  subid = "Subject", block = "Block", trial = "Trial",
+  object = c("Object_1", "Object_2", "Object_3"),
+  reward = c("Reward_1", "Reward_2", "Reward_3"),
+  action = "Action",
+  exinfo = c("SetSize")
+)
+source("./functions_plot.R")
 ```
 
 ```{r}
@@ -63,11 +49,18 @@ data_fitting <- base::do.call(
     }
   )
 ) 
+```
 
-p <- extract_error_history(data_fitting, "Action")
-plot_error_analysis(p)
+```{r}
+plot_setsize_analysis(data_fitting)
+
+ggplot2::ggsave(filename = "../SetSize_Effect_Human.png", width = 8, height = 6)
+
+plot_error_analysis(data_fitting, "Action")
 
 ggplot2::ggsave(filename = "../Error_Effect_Human.png", width = 8, height = 6)
 
-rm(p)
+plot_avoid_error(data_fitting)
+
+ggplot2::ggsave(filename = "../Avoid_Effect_Human.png", width = 8, height = 6)
 ```

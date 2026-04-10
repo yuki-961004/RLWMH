@@ -47,8 +47,9 @@ In each trial, an image is presented, and participants choose between **three di
 ### Target Experiment Effect
 
 <p align="center">
-    <img src="./FIGURE/Human/SetSize_Effect_Human.png" alt="arrow" width="40%" style="display: inline;">
-    <img src="./FIGURE/Human/Error_Effect_Human.png" alt="arrow" width="40%" style="display: inline;">
+    <img src="./FIGURE/Human/SetSize_Effect_Human.png" alt="arrow" width="30%" style="display: inline;">
+    <img src="./FIGURE/Human/Error_Effect_Human.png" alt="arrow" width="30%" style="display: inline;">
+    <img src="./FIGURE/Human/Avoid_Effect_Human.png" alt="arrow" width="30%" style="display: inline;">
 </p>
 
 #### SetSize Effect

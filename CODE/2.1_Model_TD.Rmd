@@ -39,7 +39,7 @@ source("./functions_plot.R")
 ```
 
 
-## TD(test)
+## test
 
 ```{r}
 multiRL.model <- multiRL::run_m(
@@ -48,10 +48,9 @@ multiRL.model <- multiRL::run_m(
   colnames = colnames,
   params = list(
     free = list(
-      alpha = 0.6,
-      beta = 2
+      alpha = 0.6
     ),
-    fixed = list(delta = 0),
+    fixed = list(beta = 25, delta = 0),
     constant = list(Q0 = 0.33, reset = 0.33)
   ),
   priors = list(),
@@ -66,14 +65,14 @@ multiRL.model <- multiRL::run_m(
 multiRL.summary <- multiRL::summary(multiRL.model)
 ```
 
-## TD(model)
+## creat
 
 ```{r}
 TD <- function(params){
   
   params <- list(
-    free = list(alpha = params[1], beta = params[2]),
-    fixed = list(delta = 0),
+    free = list(alpha = params[1]),
+    fixed = list(beta = 25, delta = 0),
     constant = list(Q0 = 0.33, reset = 0.33)
   )
 
@@ -93,7 +92,7 @@ TD <- function(params){
 
 ```
 
-## TD(recovery)
+## recovery
 
 ```{r}
 reticulate::use_condaenv(condaenv = "tf-gpu", required = TRUE)
@@ -101,7 +100,7 @@ reticulate::use_condaenv(condaenv = "tf-gpu", required = TRUE)
 
 ```{r}
 recovery <- multiRL::rcv_d(
-  estimate = "MLE",
+  estimate = "RNN",
   algorithm = "NLOPT_GN_MLSL",
   
   data = data,
@@ -111,14 +110,13 @@ recovery <- multiRL::rcv_d(
   models = list(TD),
   priors = list(
     list(
-      alpha = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)}, 
-      beta = function(x) {stats::rexp(n = 1, rate = 1)}
+      alpha = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)}
     )
   ),
   settings = list(list(name = "TD")),
   
-  lowers = list(c(0, 0)),
-  uppers = list(c(1, 10)),
+  lowers = list(c(0)),
+  uppers = list(c(1)),
   control = list(
     core = 10, sample = 100, 
     # LBI
@@ -126,9 +124,10 @@ recovery <- multiRL::rcv_d(
     # SBI
     train = 1000,
     # ABC
-    reduction = "PCA", ncomp = 6,
+    reduction = "PCA", #ncomp = 6,
     # RNN
-    info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize")
+    info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize"),
+    loss = "MDN", L = 2, check = FALSE
   )
 )
 
@@ -153,17 +152,13 @@ save(replay.recovery, file = "../OUTPUT/replay.recovery.TD.Rdata")
 
 p <- plot(x = replay.recovery)
 ggplot2::ggsave(
-  plot = p$param$TD[[1]], filename = "../TD_alpha.png",
-  width = 5, height = 5
-)
-ggplot2::ggsave(
-  plot = p$param$TD[[2]], filename = "../TD_beta.png",
+  plot = p$param[[1]]$alpha, filename = "../TD_alpha.png",
   width = 5, height = 5
 )
 rm(p)
 ```
 
-## TD(fitting)
+## fit
 
 ```{r}
 fitting <- multiRL::fit_p(
@@ -201,8 +196,6 @@ fitting <- multiRL::fit_p(
 save(fitting, file = "../OUTPUT/fitting.TD.Rdata")
 ```
 
-## TD(replay)
-
 ```{r}
 replay.fitting <- multiRL::rpl_e(
   result = fitting,
@@ -222,6 +215,8 @@ replay.fitting <- multiRL::rpl_e(
 
 save(replay.fitting, file = "../OUTPUT/replay.fitting.TD.Rdata")
 ```
+
+## plot
 
 ```{r}
 #load("../OUTPUT/replay.fitting.TD.Rdata")
