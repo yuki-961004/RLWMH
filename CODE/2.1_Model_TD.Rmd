@@ -100,8 +100,7 @@ reticulate::use_condaenv(condaenv = "tf-gpu", required = TRUE)
 
 ```{r}
 recovery <- multiRL::rcv_d(
-  estimate = "RNN",
-  algorithm = "NLOPT_GN_MLSL",
+  estimate = "ABC",
   
   data = data,
   behrule = behrule,
@@ -122,9 +121,9 @@ recovery <- multiRL::rcv_d(
     # LBI
     iter = 100,
     # SBI
-    train = 1000,
+    train = 1000, 
     # ABC
-    reduction = "PCA", #ncomp = 6,
+    reduction = "PLS", tol = 0.1, ncomp = 6,
     # RNN
     info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize"),
     loss = "MDN", L = 2, check = FALSE

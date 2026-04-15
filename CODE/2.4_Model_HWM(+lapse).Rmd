@@ -1,0 +1,505 @@
+---
+title: "Untitled"
+author: "yuki"
+date: "2026-02-13"
+output: html_document
+---
+
+```{r setup}
+# raw data
+load("../DATA/data1.Rdata")
+
+# settings
+behrule = list(
+  cue = c(
+    "AJ", "AK", "AL", 
+    "BJ", "BK", "BL", 
+    "CJ", "CK", "CL", 
+    "DJ", "DK", "DL", 
+    "EJ", "EK", "EL", 
+    "FJ", "FK", "FL"
+  ),
+  rsp = c(
+    "AJ", "AK", "AL", 
+    "BJ", "BK", "BL", 
+    "CJ", "CK", "CL", 
+    "DJ", "DK", "DL", 
+    "EJ", "EK", "EL", 
+    "FJ", "FK", "FL"
+  )
+)
+colnames = list(
+  subid = "Subject", block = "Block", trial = "Trial",
+  object = c("Object_1", "Object_2", "Object_3"),
+  reward = c("Reward_1", "Reward_2", "Reward_3"),
+  action = "Action",
+  exinfo = c("SetSize")
+)
+
+source("./functions_plot.R")
+```
+
+## test
+
+```{r}
+lrng_hwm <- function(
+    shown,
+    qvalue,
+    reward,
+    utility,
+    params,
+    system,
+    ...
+){
+  
+  list2env(list(...), envir = environment())
+  
+  # If you need extra information(...)
+  # Column names may be lost(C++), indexes are recommended
+  # e.g.
+  # Trial  <- idinfo[3]
+  # Frame  <- exinfo[1]
+  # Action <- behave[1]
+  
+  alpha     <-  params[["alpha"]]
+  alphaN    <-  params[["alphaN"]]
+  alphaP    <-  params[["alphaP"]]
+  
+  # Determine the model currently in use based on which parameters are free.
+  if (
+    system == "RL" && !(is.null(alpha)) && is.null(alphaN) && is.null(alphaP)
+  ) {
+    model <- "TD"
+  } else if (
+    system == "RL" && is.null(alpha) && !(is.null(alphaN)) && !(is.null(alphaP))
+  ) {
+    model <- "RSTD"
+  } else if (
+    system == "WM"
+  ) {
+    model <- "WM"
+    alpha <- 1
+  } else {
+    stop("Unknown Model! Plase modify your learning rate function")
+  }
+
+  # TD
+  if (model == "TD") {
+    update <- qvalue + alpha  * (utility - qvalue)
+  # RSTD
+  } else if (model == "RSTD" && utility < qvalue) {
+    update <- qvalue + alphaN * (utility - qvalue)
+  } else if (model == "RSTD" && utility >= qvalue) {
+    update <- qvalue + alphaP * (utility - qvalue)
+  # WM
+  } else if (model == "WM") {
+    update <- qvalue + alpha  * (reward - qvalue)
+  }
+
+  return(update)
+}
+```
+
+```{r}
+prob_hwm <- function(
+    shown,
+    qvalue, 
+    explor,
+    params,
+    system,
+    ...
+){
+  
+  list2env(list(...), envir = environment())
+  
+  # If you need extra information(...)
+  # Column names may be lost(C++), indexes are recommended
+  # e.g.
+  # Trial  <- idinfo[3]
+  # Frame  <- exinfo[1]
+  # Action <- behave[1]
+  
+  setsize  <- as.numeric(exinfo[1])
+  
+  beta     <- params[["beta"]]
+  lapse    <- params[["lapse"]]
+  weight   <- params[["weight"]]
+  capacity <- params[["capacity"]]
+
+  index     <- which(!is.na(qvalue[[1]]))
+  n_shown   <- length(index)
+  n_system  <- length(qvalue)
+  n_options <- length(qvalue[[1]])
+  overload  <- min(1, (capacity / setsize))
+  
+  # Assign weights to different systems
+  weight_adj <- overload * weight
+  rho <- c(1 - weight_adj, weight_adj)
+  
+  # Compute the probabilities estimated by different systems
+  prob_mat <- matrix(0, nrow = n_options, ncol = n_system)
+  
+  if (explor == 1) {
+    prob_mat[index, ] <- 1 / n_shown
+    prob_mat[prob_mat == 0] <- NA
+  } else {
+    for (s in seq_len(n_system)) {
+      sub_qvalue <- qvalue[[s]]
+      exp_stable <- exp(beta * (sub_qvalue - max(sub_qvalue, na.rm = TRUE)))
+      prob_mat[, s] <- exp_stable / sum(exp_stable, na.rm = TRUE)
+    }
+  }
+  
+  # Weighted average
+  prob <- as.vector(prob_mat %*% rho)
+  
+  # lapse
+  prob <- (1 - lapse * n_shown) * prob + lapse
+  
+  return(prob)
+}
+```
+
+```{r}
+bias_hwm <- function(
+    shown,
+    count,
+    params,
+    ...
+){
+  
+  list2env(list(...), envir = environment())
+  
+  # If you need extra information(...)
+  # Column names may be lost(C++), indexes are recommended
+  # e.g.
+  # Trial  <- idinfo[3]
+  # Frame  <- exinfo[1]
+  # Action <- behave[1]
+  
+  # Sticky to the same position
+  position <- behave[4]
+  if (is.na(position)) {
+    last_position <- shown * 0
+  } else {
+    last_position <- as.numeric(shown == as.numeric(position))
+  }
+  
+  delta     <- params[["delta"]]
+  sticky    <- params[["sticky"]]
+  
+  # Upper-Confidence-Bound
+  bias <- delta * sqrt(log(count + exp(1)) / (count + 1e-10)) + 
+    # # Sticky to the same position
+    sticky * last_position
+    
+  return(bias)
+}
+```
+
+```{r}
+dcay_hwm <- function(
+    shown,
+    value0, 
+    values,
+    reward,
+    params,
+    system,
+    ...
+){
+  
+  list2env(list(...), envir = environment())
+  
+  # If you need extra information(...)
+  # Column names may be lost(C++), indexes are recommended
+  # e.g.
+  # Trial  <- idinfo[3]
+  # Frame  <- exinfo[1]
+  # Action <- behave[1]
+  
+  zeta       <-  params[["zeta"]]
+  bonus      <-  params[["bonus"]]
+  
+  if (system == "RL") {
+    decay <- values
+  } else if (system == "WM") {
+    decay <- values + zeta * (value0 - values)
+  }
+  
+  return(decay)
+}
+```
+
+
+```{r}
+multiRL.model <- multiRL::run_m(
+  data = data[data[, "Subject"] == 1, ],
+  behrule = behrule,
+  colnames = colnames,
+  params = list(
+    free = list(
+      alpha = 0.6,
+      zeta = 0.5,
+      weight = 0.5,
+      capacity = 3,
+      lapse = 0.01
+    ),
+    fixed = list(beta = 25, gamma = 0, delta = 0),
+    constant = list(Q0 = 0.33, reset = 0.33)
+  ),
+  priors = list(),
+  settings = list(
+    name = "HWM",
+    mode = "fitting",
+    estimate = "MLE",
+    policy = "on",
+    system = c("RL", "WM")
+  ),
+  funcs = list(
+    lrng_func = lrng_hwm, dcay_func = dcay_hwm,
+    bias_func = bias_hwm, prob_func = prob_hwm
+  )
+)
+
+multiRL.summary <- multiRL::summary(multiRL.model)
+```
+
+## model
+
+```{r}
+HWM <- function(params){
+  
+  params <- list(
+    free = list(
+      alpha = params[1], 
+      zeta = params[2], weight = params[3], capacity = params[4], 
+      lapse = params[5]
+    ),
+    fixed = list(beta = 25, gamma = 0, delta = 0),
+    constant = list(Q0 = 0.33, reset = 0.33)
+  )
+
+  multiRL.model <- multiRL::run_m(
+    data = data,
+    behrule = behrule,
+    colnames = colnames,
+    params = params,
+    funcs = funcs,
+    priors = priors,
+    settings = settings
+  )
+  
+  assign(x = "multiRL.model", value = multiRL.model, envir = multiRL.env)
+  return(.return_result(multiRL.model))
+}
+
+```
+
+## WM(recovery)
+
+```{r}
+reticulate::use_condaenv(condaenv = "tf-gpu", required = TRUE)
+```
+
+```{r}
+recovery <- multiRL::rcv_d(
+  estimate = "RNN",
+  
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+
+  models = list(HWM),
+  funcs = list(list(
+    lrng_func = lrng_hwm, dcay_func = dcay_hwm,
+    bias_func = bias_hwm, prob_func = prob_hwm
+  )),
+  priors = list(
+    list(
+      alpha = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)},
+      zeta = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)},
+      weight = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)},
+      capacity = function(x) {stats::runif(n = 1, min = 2, max = 6)},
+      lapse = function(x) {stats::runif(n = 1, min = 0, max = 0.33)}
+    )
+  ),
+  settings = list(list(name = "HWM", system = c("RL", "WM"))),
+  
+  lowers = list(c(0, 0, 0, 2, 0)),
+  uppers = list(c(1, 1, 1, 6, 0.33)),
+  control = list(
+    core = 10, sample = 100, 
+    # LBI
+    iter = 100,
+    # SBI
+    train = 1000,
+    # ABC
+    reduction = "PLS", #ncomp = 6,
+    # RNN
+    info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize"),
+    loss = "MDN", L = 2, check = FALSE
+  )
+)
+
+save(recovery, file = "../OUTPUT/recovery.HWM(+lapse).Rdata")
+```
+
+```{r}
+replay.recovery <- multiRL::rpl_e(
+  result = recovery,
+
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+  
+  models = list(HWM),
+  settings = list(list(name = "HWM", system = c("RL", "WM"))),
+  funcs = list(list(
+    lrng_func = lrng_hwm, dcay_func = dcay_hwm,
+    bias_func = bias_hwm, prob_func = prob_hwm
+  )),
+
+  omit = c("data", "funcs")
+)
+  
+save(replay.recovery, file = "../OUTPUT/replay.recovery.HWM(+lapse).Rdata")
+
+p <- plot(x = replay.recovery)
+
+ggplot2::ggsave(
+  plot = p$param[[1]]$alpha, filename = "../HWM(+lapse)_alpha.png",
+  width = 5, height = 5
+)
+ggplot2::ggsave(
+  plot = p$param[[1]]$zeta, filename = "../HWM(+lapse)_zeta.png",
+  width = 5, height = 5
+)
+ggplot2::ggsave(
+  plot = p$param[[1]]$weight, filename = "../HWM(+lapse)_weight.png",
+  width = 5, height = 5
+)
+ggplot2::ggsave(
+  plot = p$param[[1]]$capacity, filename = "../HWM(+lapse)_capacity.png",
+  width = 5, height = 5
+)
+ggplot2::ggsave(
+  plot = p$param[[1]]$lapse, filename = "../HWM(+lapse)_lapse.png",
+  width = 5, height = 5
+)
+rm(p)
+```
+
+## fitting
+
+```{r}
+fitting <- multiRL::fit_p(
+  estimate = "MLE",
+  
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+
+  models = list(HWM),
+  funcs = list(list(
+    lrng_func = lrng_hwm, dcay_func = dcay_hwm,
+    bias_func = bias_hwm, prob_func = prob_hwm
+  )),
+  priors = list(
+    list(
+      alpha = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)},
+      zeta = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)},
+      weight = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)},
+      capacity = function(x) {stats::runif(n = 1, min = 2, max = 6)},
+      lapse = function(x) {stats::runif(n = 1, min = 1e-5, max = 0.33)},
+      sticky = function(x) {stats::rbeta(n = 1, shape1 = 2, shape2 = 2)}
+    )
+  ),
+  settings = list(list(name = "HWM", system = c("RL", "WM"))),
+  
+  lowers = list(c(0, 0, 0, 2, 1e-5, 0)),
+  uppers = list(c(1, 1, 1, 6, 0.33, 1)),
+  control = list(
+    core = 10, sample = 100, 
+    # LBI
+    iter = 100,
+    # SBI
+    train = 1000,
+    # ABC
+    reduction = "PLS", #ncomp = 6,
+    # RNN
+    info = c("Object_1", "Object_2", "Object_3", "Action", "SetSize"),
+    loss = "MDN", L = 2, check = FALSE
+  )
+)
+
+save(fitting, file = "../OUTPUT/fitting.RLWMH.Rdata")
+```
+
+## Sticky(replay)
+
+```{r}
+replay.fitting <- multiRL::rpl_e(
+  result = fitting,
+
+  data = data,
+  behrule = behrule,
+  colnames = colnames,
+  
+  models = list(RLWMH),
+  settings = list(list(name = "RLWMH", system = c("RL", "WM"))),
+  funcs = list(list(
+    lrng_func = lrng_rlwmh, dcay_func = dcay_rlwmh,
+    bias_func = bias_rlwmh, prob_func = prob_rlwmh
+  )),
+
+  omit = c("funcs")
+)
+
+#p <- plot(replay.fitting)
+#ggplot2::ggsave(filename = "../fitting_Sticky.png", width = 40, height = 5)
+
+save(replay.fitting, file = "../OUTPUT/replay.fitting.RLWMH.Rdata")
+```
+
+```{r}
+#load("../OUTPUT/replay.fitting.RLWMH.Rdata")
+
+data_fitting <- base::do.call(
+  base::rbind,
+  base::lapply(
+    replay.fitting[[1]],
+    function(subject) {
+      subject[["multiRL.summary"]]@data
+    }
+  )
+)
+
+p <- extract_setsize_history(data_fitting)
+plot_setsize_analysis(p)
+
+ggplot2::ggsave(filename = "../SetSize_Effect_RLWMH.png", width = 8, height = 6)
+rm(p)
+```
+
+```{r}
+#load("../OUTPUT/replay.fitting.RLWMH.Rdata")
+
+data_fitting <- base::do.call(
+  base::rbind,
+  base::lapply(
+    replay.fitting[[1]],
+    function(subject) {
+      subject[["multiRL.summary"]]@data
+    }
+  )
+)
+
+p <- extract_error_history(data_fitting, "Simulation")
+plot_error_analysis(p)
+
+ggplot2::ggsave(filename = "../Error_Effect_RLWMH.png", width = 8, height = 6)
+
+rm(p)
+```
+
+
